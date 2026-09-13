@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Center circle (zen focus core) -->
+    <path
+        android:fillColor="#F6F6F8"
+        android:pathData="M54,54m-9,0a9,9 0 1,1 18,0a9,9 0 1,1 -18,0" />
+    <!-- Outer focus brackets / arc ring -->
+    <path
+        android:strokeColor="#F6F6F8"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M40,32 A 25 25 0 0 1 68,32" />
+    <path
+        android:strokeColor="#F6F6F8"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M76,46 A 25 25 0 0 1 76,62" />
+    <path
+        android:strokeColor="#F6F6F8"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M68,76 A 25 25 0 0 1 40,76" />
+    <path
+        android:strokeColor="#F6F6F8"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M32,62 A 25 25 0 0 1 32,46" />
+</vector>

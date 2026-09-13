@@ -1,0 +1,6 @@
+{
+  "name": "Focuz",
+  "description": "A minimal, calm focus and digital wellbeing app for students and young professionals with intent-aware nudges and accountability.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
