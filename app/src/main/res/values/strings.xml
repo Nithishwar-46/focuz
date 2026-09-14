@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Focuz</string>
+    <string name="accessibility_service_description">Enforces your personalized social media limits by closing apps like Instagram and redirecting to mindful habits once your time is up.</string>
 </resources>
+

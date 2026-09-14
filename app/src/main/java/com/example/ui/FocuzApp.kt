@@ -46,6 +46,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -57,12 +58,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.FocuzViewModel
 import com.example.ui.components.IntentTagModal
@@ -91,7 +94,7 @@ sealed class FocuzTab(
   object Home : FocuzTab(0, "Dashboard", Icons.Filled.PieChart, Icons.Outlined.PieChart, "tab_home")
   object Session : FocuzTab(1, "Focus", Icons.Filled.HourglassTop, Icons.Outlined.HourglassTop, "tab_session")
   object Streaks : FocuzTab(2, "Streaks", Icons.Filled.LocalFireDepartment, Icons.Outlined.LocalFireDepartment, "tab_streaks")
-  object Permitted : FocuzTab(3, "Windows", Icons.Filled.Schedule, Icons.Outlined.Schedule, "tab_permitted")
+  object Permitted : FocuzTab(3, "Limits", Icons.Filled.Schedule, Icons.Outlined.Schedule, "tab_permitted")
   object Profile : FocuzTab(4, "Profile", Icons.Filled.Person, Icons.Outlined.Person, "tab_profile")
 }
 
@@ -99,10 +102,16 @@ sealed class FocuzTab(
 fun FocuzApp(
   viewModel: FocuzViewModel = viewModel()
 ) {
+  val context = LocalContext.current
   val uiState by viewModel.uiState.collectAsState()
   var selectedTabIndex by remember { mutableIntStateOf(0) }
   val snackbarHostState = remember { SnackbarHostState() }
   val coroutineScope = rememberCoroutineScope()
+
+  LifecycleResumeEffect(Unit) {
+    viewModel.refreshSocialBlockerState(context)
+    onPauseOrDispose { }
+  }
 
   val tabs = listOf(
     FocuzTab.Home,
@@ -118,9 +127,8 @@ fun FocuzApp(
     AuthScreen(
       isLoading = uiState.isAuthLoading,
       errorMessage = uiState.authErrorMessage,
-      onGoogleSignIn = { viewModel.signInWithGoogle() },
       onEmailSignIn = { email, pass -> viewModel.signInWithEmail(email, pass) },
-      onEmailSignUp = { email, pass -> viewModel.signUpWithEmail(email, pass) },
+      onEmailSignUp = { email, pass, name -> viewModel.signUpWithEmail(email, pass, name) },
       onSkipForNow = { viewModel.continueAsGuest() }
     )
     return
@@ -191,6 +199,7 @@ fun FocuzApp(
           onOpenIntentPopup = { appName -> viewModel.openIntentModal(appName) },
           onOpenReplacementCard = { viewModel.openReplacementCard() },
           onNavigateToFocusSession = { selectedTabIndex = 1 },
+          onNavigateToLimits = { selectedTabIndex = 3 },
           onOpenProfile = { selectedTabIndex = 4 },
           onSignOut = { viewModel.signOut() }
         )
@@ -205,7 +214,8 @@ fun FocuzApp(
               snackbarHostState.showSnackbar("Nice session! Real focus minutes recorded.")
             }
           },
-          onSelectMode = { mode -> viewModel.setFocusMode(mode) }
+          onSelectMode = { mode -> viewModel.setFocusMode(mode) },
+          onSetDuration = { mins -> viewModel.setCustomSessionMinutes(mins) }
         )
         2 -> AccountabilityScreen(
           uiState = uiState,
@@ -218,7 +228,12 @@ fun FocuzApp(
         )
         3 -> PermittedScrollScreen(
           uiState = uiState,
-          onSelectDuration = { duration -> viewModel.setWindowDuration(duration) }
+          onSelectDuration = { duration -> viewModel.setWindowDuration(duration) },
+          onUpdateAppLimit = { pkg, limitMins -> viewModel.updateSocialAppLimit(context, pkg, limitMins) },
+          onToggleAppEnabled = { pkg, isEnabled -> viewModel.toggleSocialAppEnabled(context, pkg, isEnabled) },
+          onTestBlock = { pkg -> viewModel.triggerTestBlock(context, pkg) },
+          onRefreshPermissions = { viewModel.refreshSocialBlockerState(context) },
+          onDismissAccessibilityBanner = { viewModel.dismissAccessibilityBanner(context) }
         )
         4 -> ProfileScreen(
           uiState = uiState,

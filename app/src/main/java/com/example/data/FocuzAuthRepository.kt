@@ -57,15 +57,26 @@ class FocuzAuthRepository {
     }
   }
 
-  suspend fun signUpWithEmail(email: String, pass: String): Result<AuthUserState> {
+  suspend fun signUpWithEmail(email: String, pass: String, name: String = ""): Result<AuthUserState> {
     val firebaseAuth = auth ?: return Result.failure(IllegalStateException("Auth not initialized"))
     return try {
       val result = firebaseAuth.createUserWithEmailAndPassword(email.trim(), pass).await()
       val u = result.user
+      val chosenName = name.trim().ifBlank { email.substringBefore("@").replaceFirstChar { it.uppercase() } }
+      if (u != null && chosenName.isNotBlank()) {
+        try {
+          val profileUpdates = com.google.firebase.auth.UserProfileChangeRequest.Builder()
+            .setDisplayName(chosenName)
+            .build()
+          u.updateProfile(profileUpdates).await()
+        } catch (ignored: Exception) {
+          Log.w(TAG, "Profile displayName update non-critical: ${ignored.message}")
+        }
+      }
       val userState = AuthUserState(
         uid = u?.uid ?: UUID.randomUUID().toString(),
         email = u?.email ?: email,
-        displayName = email.substringBefore("@"),
+        displayName = chosenName,
         isAuthenticated = true
       )
       Result.success(userState)

@@ -5,6 +5,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -166,9 +167,9 @@ fun IntentTagModal(
                 modifier = Modifier
                   .fillMaxWidth()
                   .clip(RoundedCornerShape(16.dp))
-                  .background(if (isSelected) OffWhitePrimary else CharcoalBackground)
+                  .background(if (isSelected) androidx.compose.ui.graphics.Color(0xFF22252E) else CharcoalBackground)
                   .border(
-                    width = 1.dp,
+                    width = if (isSelected) 1.5.dp else 1.dp,
                     color = if (isSelected) OffWhitePrimary else CharcoalBorder,
                     shape = RoundedCornerShape(16.dp)
                   )
@@ -186,14 +187,14 @@ fun IntentTagModal(
                     text = reason.prompt,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (isSelected) CharcoalBackground else OffWhitePrimary
+                    color = if (isSelected) androidx.compose.ui.graphics.Color.White else OffWhitePrimary
                   )
                 }
 
                 Text(
                   text = reason.subtitle,
                   style = MaterialTheme.typography.bodySmall,
-                  color = if (isSelected) CharcoalBackground.copy(alpha = 0.8f) else OffWhiteMuted
+                  color = if (isSelected) OffWhitePrimary.copy(alpha = 0.9f) else OffWhiteMuted
                 )
               }
             }
@@ -223,9 +224,10 @@ fun IntentTagModal(
                 .height(52.dp)
                 .testTag("action_5_mins"),
               colors = ButtonDefaults.buttonColors(
-                containerColor = OffWhitePrimary,
-                contentColor = CharcoalBackground
+                containerColor = androidx.compose.ui.graphics.Color(0xFF22252E),
+                contentColor = androidx.compose.ui.graphics.Color.White
               ),
+              border = BorderStroke(1.5.dp, OffWhitePrimary),
               shape = RoundedCornerShape(14.dp)
             ) {
               Row(
@@ -235,12 +237,14 @@ fun IntentTagModal(
                 Icon(
                   imageVector = Icons.Default.Timer,
                   contentDescription = null,
-                  modifier = Modifier.size(16.dp)
+                  modifier = Modifier.size(16.dp),
+                  tint = androidx.compose.ui.graphics.Color.White
                 )
                 Text(
                   text = "5 Mindful Mins",
                   style = MaterialTheme.typography.labelLarge,
-                  fontWeight = FontWeight.SemiBold
+                  fontWeight = FontWeight.SemiBold,
+                  color = androidx.compose.ui.graphics.Color.White
                 )
               }
             }
@@ -252,9 +256,10 @@ fun IntentTagModal(
                 .weight(1f)
                 .height(52.dp)
                 .testTag("action_suggest_alternative"),
-              border = androidx.compose.foundation.BorderStroke(1.dp, CharcoalBorder),
+              border = BorderStroke(1.5.dp, CharcoalBorder),
               shape = RoundedCornerShape(14.dp),
               colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = CharcoalSurface,
                 contentColor = OffWhitePrimary
               )
             ) {
@@ -270,7 +275,8 @@ fun IntentTagModal(
                 )
                 Text(
                   text = "5-Min Reset",
-                  style = MaterialTheme.typography.labelLarge
+                  style = MaterialTheme.typography.labelLarge,
+                  color = OffWhitePrimary
                 )
               }
             }

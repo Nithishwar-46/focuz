@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material3.Button
@@ -59,6 +61,7 @@ fun HomeScreen(
   onOpenIntentPopup: (String) -> Unit,
   onOpenReplacementCard: () -> Unit,
   onNavigateToFocusSession: () -> Unit,
+  onNavigateToLimits: () -> Unit = {},
   onOpenProfile: () -> Unit = {},
   onSignOut: () -> Unit = {},
   modifier: Modifier = Modifier
@@ -243,13 +246,14 @@ fun HomeScreen(
               onClick = { onOpenIntentPopup("Instagram") },
               modifier = Modifier
                 .weight(1f)
-                .height(46.dp)
+                .height(48.dp)
                 .testTag("btn_trigger_intent_modal"),
               colors = ButtonDefaults.buttonColors(
-                containerColor = OffWhitePrimary,
-                contentColor = CharcoalBackground
+                containerColor = androidx.compose.ui.graphics.Color(0xFF22252E),
+                contentColor = androidx.compose.ui.graphics.Color.White
               ),
-              shape = RoundedCornerShape(12.dp)
+              border = BorderStroke(1.5.dp, OffWhitePrimary),
+              shape = RoundedCornerShape(14.dp)
             ) {
               Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -258,12 +262,14 @@ fun HomeScreen(
                 Icon(
                   imageVector = Icons.Default.TouchApp,
                   contentDescription = null,
-                  modifier = Modifier.size(16.dp)
+                  modifier = Modifier.size(16.dp),
+                  tint = androidx.compose.ui.graphics.Color.White
                 )
                 Text(
                   text = "Open App Nudge",
                   style = MaterialTheme.typography.labelMedium,
-                  fontWeight = FontWeight.SemiBold
+                  fontWeight = FontWeight.SemiBold,
+                  color = androidx.compose.ui.graphics.Color.White
                 )
               }
             }
@@ -272,19 +278,103 @@ fun HomeScreen(
               onClick = onOpenReplacementCard,
               modifier = Modifier
                 .weight(1f)
-                .height(46.dp)
+                .height(48.dp)
                 .testTag("btn_trigger_replacement_card"),
-              border = androidx.compose.foundation.BorderStroke(1.dp, CharcoalBorder),
-              shape = RoundedCornerShape(12.dp),
+              border = BorderStroke(1.5.dp, CharcoalBorder),
+              shape = RoundedCornerShape(14.dp),
               colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = CharcoalSurface,
                 contentColor = OffWhitePrimary
               )
             ) {
               Text(
                 text = "5-Min Swap Card",
-                style = MaterialTheme.typography.labelMedium
+                style = MaterialTheme.typography.labelMedium,
+                color = OffWhitePrimary
               )
             }
+          }
+        }
+      }
+    }
+
+    // Social Media App Limit & Blocker Quick Card
+    item {
+      val instagramApp = uiState.monitoredSocialApps.find { it.packageName == "com.instagram.android" }
+      val isServiceRunning = uiState.isAccessibilityEnabled
+
+      Box(
+        modifier = Modifier
+          .fillMaxWidth()
+          .clip(RoundedCornerShape(20.dp))
+          .background(CharcoalSurface)
+          .border(1.dp, CharcoalBorder, RoundedCornerShape(20.dp))
+          .clickable { onNavigateToLimits() }
+          .padding(18.dp)
+          .testTag("home_app_blocker_card")
+      ) {
+        Column {
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+          ) {
+            Row(
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+              Box(
+                modifier = Modifier
+                  .size(8.dp)
+                  .clip(CircleShape)
+                  .background(if (isServiceRunning) androidx.compose.ui.graphics.Color(0xFF81C784) else androidx.compose.ui.graphics.Color(0xFFFFB74D))
+              )
+              Text(
+                text = "APP CEILING & BLOCKER",
+                style = MaterialTheme.typography.labelSmall,
+                color = OffWhiteMuted,
+                letterSpacing = 1.sp
+              )
+            }
+
+            Text(
+              text = if (isServiceRunning) "Enforcing" else "Setup Needed",
+              style = MaterialTheme.typography.labelSmall,
+              color = if (isServiceRunning) androidx.compose.ui.graphics.Color(0xFF81C784) else androidx.compose.ui.graphics.Color(0xFFFFB74D),
+              fontWeight = FontWeight.Medium
+            )
+          }
+
+          Spacer(modifier = Modifier.height(10.dp))
+
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+          ) {
+            Column(modifier = Modifier.weight(1f)) {
+              Text(
+                text = "Instagram Limit: ${instagramApp?.limitMinutes ?: 15} mins/day",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = OffWhitePrimary
+              )
+              Text(
+                text = if (isServiceRunning)
+                  "Kicks to Home & shows lockout screen if limit is reached."
+                else
+                  "Tap to enable Accessibility and adjust daily limits.",
+                style = MaterialTheme.typography.bodySmall,
+                color = OffWhiteMuted
+              )
+            }
+
+            Icon(
+              imageVector = Icons.Default.ArrowForward,
+              contentDescription = "Manage Limits",
+              tint = OffWhitePrimary,
+              modifier = Modifier.size(18.dp)
+            )
           }
         }
       }
@@ -301,6 +391,20 @@ fun HomeScreen(
 
       Spacer(modifier = Modifier.height(10.dp))
 
+      val totalActivityMins = uiState.intentionalMinutes + uiState.scrollMinutes
+      val intentionalRatioText = if (totalActivityMins > 0) {
+        val pct = ((uiState.intentionalMinutes.toFloat() / totalActivityMins) * 100).toInt()
+        "$pct%"
+      } else if (uiState.intentionalMinutes > 0) {
+        "100%"
+      } else {
+        "100%"
+      }
+
+      val focusHours = uiState.intentionalMinutes / 60
+      val focusMins = uiState.intentionalMinutes % 60
+      val focusedTimeFormatted = if (focusHours > 0) "${focusHours}h ${focusMins}m" else "${focusMins}m"
+
       Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -314,9 +418,9 @@ fun HomeScreen(
         )
 
         QuickStatCard(
-          value = "90%",
+          value = intentionalRatioText,
           label = "Intentional Ratio",
-          microcopy = "Above weekly goal",
+          microcopy = if (totalActivityMins > 0) "Calculated from study & scroll" else "Ready for first session",
           modifier = Modifier.weight(1f),
           tag = "stat_ratio"
         )
@@ -337,9 +441,9 @@ fun HomeScreen(
         )
 
         QuickStatCard(
-          value = "2h 45m",
+          value = focusedTimeFormatted,
           label = "Focused Time",
-          microcopy = "High-quality deep work",
+          microcopy = if (uiState.intentionalMinutes > 0) "Real recorded study time" else "Starts at 0m • timer updates live",
           modifier = Modifier.weight(1f),
           tag = "stat_focus_time"
         )

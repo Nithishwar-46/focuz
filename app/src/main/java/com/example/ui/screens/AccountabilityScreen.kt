@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -314,13 +315,14 @@ fun AccountabilityScreen(
               onClick = onSendCheer,
               modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp)
+                .height(50.dp)
                 .testTag("send_cheer_btn"),
               colors = ButtonDefaults.buttonColors(
-                containerColor = if (uiState.cheerSent) CharcoalBackground else OffWhitePrimary,
-                contentColor = if (uiState.cheerSent) OffWhitePrimary else CharcoalBackground
+                containerColor = if (uiState.cheerSent) CharcoalSurface else androidx.compose.ui.graphics.Color(0xFF22252E),
+                contentColor = androidx.compose.ui.graphics.Color.White
               ),
-              shape = RoundedCornerShape(12.dp)
+              border = BorderStroke(1.5.dp, if (uiState.cheerSent) CharcoalBorder else OffWhitePrimary),
+              shape = RoundedCornerShape(14.dp)
             ) {
               Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -329,12 +331,14 @@ fun AccountabilityScreen(
                 Icon(
                   imageVector = if (uiState.cheerSent) Icons.Default.Favorite else Icons.Default.WavingHand,
                   contentDescription = null,
-                  modifier = Modifier.size(18.dp)
+                  modifier = Modifier.size(18.dp),
+                  tint = if (uiState.cheerSent) androidx.compose.ui.graphics.Color(0xFFFF80AB) else androidx.compose.ui.graphics.Color.White
                 )
                 Text(
                   text = if (uiState.cheerSent) "Cheer sent to ${currentFriend.name}!" else "Send gentle cheer 👋",
                   style = MaterialTheme.typography.labelLarge,
-                  fontWeight = FontWeight.SemiBold
+                  fontWeight = FontWeight.SemiBold,
+                  color = androidx.compose.ui.graphics.Color.White
                 )
               }
             }

@@ -1,5 +1,10 @@
 package com.example.ui.screens
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -22,6 +27,8 @@ import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -41,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -54,11 +62,13 @@ import com.example.ui.theme.CharcoalSurface
 import com.example.ui.theme.OffWhiteMuted
 import com.example.ui.theme.OffWhitePrimary
 import com.example.ui.theme.OffWhiteSubtle
+import java.io.File
+import java.io.FileOutputStream
 
 /**
  * Clean, minimalist Profile Screen allowing users to view and edit their name,
- * profile picture (URL), bio, and daily focus goal.
- * Directly updates and saves to Firebase Firestore.
+ * profile picture (with gallery photo upload and URL support), bio, and daily focus goal.
+ * Directly updates and saves to Firebase Firestore and local storage.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,6 +79,7 @@ fun ProfileScreen(
   onSignOut: () -> Unit,
   modifier: Modifier = Modifier
 ) {
+  val context = LocalContext.current
   val initialName = uiState.userProfile.name.ifBlank {
     uiState.currentUser?.displayName ?: ""
   }
@@ -85,6 +96,33 @@ fun ProfileScreen(
 
   var isEditingPhoto by remember { mutableStateOf(false) }
   var saveSuccessMessage by remember { mutableStateOf<String?>(null) }
+
+  // Photo Picker to choose user's own image from device gallery
+  val photoPickerLauncher = rememberLauncherForActivityResult(
+    contract = ActivityResultContracts.PickVisualMedia()
+  ) { uri: Uri? ->
+    uri?.let { selectedUri ->
+      try {
+        val inputStream = context.contentResolver.openInputStream(selectedUri)
+        val file = File(context.filesDir, "user_avatar_${System.currentTimeMillis()}.jpg")
+        val outputStream = FileOutputStream(file)
+        inputStream?.use { input ->
+          outputStream.use { output ->
+            input.copyTo(output)
+          }
+        }
+        val localPhotoUri = file.toURI().toString()
+        photoUrlInput = localPhotoUri
+        onSaveProfile(nameInput, localPhotoUri, bioInput, goalInput.toIntOrNull() ?: 60)
+        saveSuccessMessage = "Profile picture updated from device photos!"
+      } catch (e: Exception) {
+        val fallbackUri = selectedUri.toString()
+        photoUrlInput = fallbackUri
+        onSaveProfile(nameInput, fallbackUri, bioInput, goalInput.toIntOrNull() ?: 60)
+        saveSuccessMessage = "Profile picture updated!"
+      }
+    }
+  }
 
   // Curated minimalist avatar presets if user wants quick 1-tap pfp
   val presetAvatars = listOf(
@@ -155,7 +193,11 @@ fun ProfileScreen(
             .clip(CircleShape)
             .background(CharcoalSurface)
             .border(2.dp, CharcoalBorder, CircleShape)
-            .clickable { isEditingPhoto = !isEditingPhoto },
+            .clickable {
+              photoPickerLauncher.launch(
+                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+              )
+            },
           contentAlignment = Alignment.Center
         ) {
           if (photoUrlInput.isNotBlank()) {
@@ -207,6 +249,59 @@ fun ProfileScreen(
           style = MaterialTheme.typography.bodySmall,
           color = OffWhiteMuted
         )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Direct Action Buttons for Photo
+        Row(
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          OutlinedButton(
+            onClick = {
+              photoPickerLauncher.launch(
+                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+              )
+            },
+            modifier = Modifier.testTag("btn_upload_photo_gallery"),
+            border = androidx.compose.foundation.BorderStroke(1.dp, OffWhitePrimary),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.outlinedButtonColors(
+              containerColor = CharcoalSurface,
+              contentColor = OffWhitePrimary
+            )
+          ) {
+            Row(
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+              Icon(
+                imageVector = Icons.Default.Upload,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = OffWhitePrimary
+              )
+              Text(
+                text = "Upload Image from Gallery",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold
+              )
+            }
+          }
+
+          OutlinedButton(
+            onClick = { isEditingPhoto = !isEditingPhoto },
+            modifier = Modifier.testTag("btn_toggle_photo_options"),
+            border = androidx.compose.foundation.BorderStroke(1.dp, CharcoalBorder),
+            shape = RoundedCornerShape(12.dp)
+          ) {
+            Text(
+              text = if (isEditingPhoto) "Close Options" else "More Options",
+              style = MaterialTheme.typography.labelSmall,
+              color = OffWhiteMuted
+            )
+          }
+        }
       }
     }
 
@@ -221,9 +316,49 @@ fun ProfileScreen(
             .border(1.dp, CharcoalBorder, RoundedCornerShape(16.dp))
             .padding(16.dp)
         ) {
-          Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+          Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Option 1: Gallery Upload Banner
+            Box(
+              modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(CharcoalBackground)
+                .border(1.dp, CharcoalBorder, RoundedCornerShape(12.dp))
+                .clickable {
+                  photoPickerLauncher.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                  )
+                }
+                .padding(14.dp)
+            ) {
+              Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+              ) {
+                Icon(
+                  imageVector = Icons.Default.PhotoLibrary,
+                  contentDescription = null,
+                  tint = OffWhitePrimary,
+                  modifier = Modifier.size(20.dp)
+                )
+                Column {
+                  Text(
+                    text = "Pick From Photos & Gallery",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = OffWhitePrimary
+                  )
+                  Text(
+                    text = "Upload your personal avatar directly from device storage",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OffWhiteMuted
+                  )
+                }
+              }
+            }
+
             Text(
-              text = "SELECT OR PASTE PHOTO URL",
+              text = "OR CHOOSE A MINIMALIST PRESET",
               style = MaterialTheme.typography.labelSmall,
               color = OffWhiteMuted,
               letterSpacing = 1.sp
@@ -396,9 +531,10 @@ fun ProfileScreen(
           .height(52.dp)
           .testTag("btn_save_profile"),
         colors = ButtonDefaults.buttonColors(
-          containerColor = OffWhitePrimary,
-          contentColor = CharcoalBackground
+          containerColor = androidx.compose.ui.graphics.Color(0xFF22252E),
+          contentColor = androidx.compose.ui.graphics.Color.White
         ),
+        border = BorderStroke(1.5.dp, OffWhitePrimary),
         shape = RoundedCornerShape(14.dp)
       ) {
         Row(
@@ -408,12 +544,14 @@ fun ProfileScreen(
           Icon(
             imageVector = Icons.Default.Check,
             contentDescription = null,
-            modifier = Modifier.size(18.dp)
+            modifier = Modifier.size(18.dp),
+            tint = androidx.compose.ui.graphics.Color.White
           )
           Text(
             text = "Save Profile to Firebase",
             style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold
+            fontWeight = FontWeight.SemiBold,
+            color = androidx.compose.ui.graphics.Color.White
           )
         }
       }

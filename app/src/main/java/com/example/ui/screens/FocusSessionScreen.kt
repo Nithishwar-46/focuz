@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -27,6 +28,7 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -41,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
@@ -70,6 +73,7 @@ fun FocusSessionScreen(
   onResumeSession: () -> Unit,
   onEndSession: () -> Unit,
   onSelectMode: (FocusContextMode) -> Unit,
+  onSetDuration: (Int) -> Unit = {},
   modifier: Modifier = Modifier
 ) {
   val minutes = uiState.sessionRemainingSeconds / 60
@@ -142,11 +146,11 @@ fun FocusSessionScreen(
               modifier = Modifier
                 .weight(1f)
                 .clip(RoundedCornerShape(14.dp))
-                .background(if (isSelected) OffWhitePrimary else CharcoalSurface)
+                .background(if (isSelected) Color(0xFF22252E) else CharcoalSurface)
                 .border(
-                  1.dp,
-                  if (isSelected) OffWhitePrimary else CharcoalBorder,
-                  RoundedCornerShape(14.dp)
+                  width = if (isSelected) 1.5.dp else 1.dp,
+                  color = if (isSelected) OffWhitePrimary else CharcoalBorder,
+                  shape = RoundedCornerShape(14.dp)
                 )
                 .clickable { onSelectMode(mode) }
                 .padding(vertical = 12.dp, horizontal = 8.dp)
@@ -157,9 +161,87 @@ fun FocusSessionScreen(
                 text = mode.title,
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                color = if (isSelected) CharcoalBackground else OffWhitePrimary,
+                color = if (isSelected) Color.White else OffWhiteMuted,
                 maxLines = 1
               )
+            }
+          }
+        }
+      }
+    }
+
+    // Timer Duration & Reminder Interval Selector
+    if (!uiState.isSessionActive) {
+      item {
+        Box(
+          modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(CharcoalSurface)
+            .border(1.dp, CharcoalBorder, RoundedCornerShape(18.dp))
+            .padding(16.dp)
+            .testTag("timer_duration_reminder_box")
+        ) {
+          Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+              modifier = Modifier.fillMaxWidth(),
+              horizontalArrangement = Arrangement.SpaceBetween,
+              verticalAlignment = Alignment.CenterVertically
+            ) {
+              Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+              ) {
+                Icon(
+                  imageVector = Icons.Default.Timer,
+                  contentDescription = null,
+                  tint = OffWhitePrimary,
+                  modifier = Modifier.size(16.dp)
+                )
+                Text(
+                  text = "DURATION & REMINDER",
+                  style = MaterialTheme.typography.labelSmall,
+                  color = OffWhiteMuted,
+                  letterSpacing = 1.sp
+                )
+              }
+              Text(
+                text = "${uiState.sessionTotalSeconds / 60}m timer",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = OffWhitePrimary
+              )
+            }
+
+            Row(
+              modifier = Modifier.fillMaxWidth(),
+              horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+              listOf(15, 25, 45, 60).forEach { presetMins ->
+                val isSelected = (uiState.sessionTotalSeconds / 60) == presetMins
+                Box(
+                  modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (isSelected) Color(0xFF22252E) else CharcoalBackground)
+                    .border(
+                      width = if (isSelected) 1.5.dp else 1.dp,
+                      color = if (isSelected) OffWhitePrimary else CharcoalBorder,
+                      shape = RoundedCornerShape(12.dp)
+                    )
+                    .clickable { onSetDuration(presetMins) }
+                    .padding(vertical = 10.dp)
+                    .testTag("preset_duration_${presetMins}m"),
+                  contentAlignment = Alignment.Center
+                ) {
+                  Text(
+                    text = "${presetMins}m",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                    color = if (isSelected) Color.White else OffWhiteMuted
+                  )
+                }
+              }
             }
           }
         }
@@ -325,24 +407,27 @@ fun FocusSessionScreen(
               .height(56.dp)
               .testTag("session_start_btn"),
             colors = ButtonDefaults.buttonColors(
-              containerColor = OffWhitePrimary,
-              contentColor = CharcoalBackground
+              containerColor = Color(0xFF22252E),
+              contentColor = Color.White
             ),
+            border = BorderStroke(1.5.dp, OffWhitePrimary),
             shape = RoundedCornerShape(16.dp)
           ) {
             Row(
               verticalAlignment = Alignment.CenterVertically,
-              horizontalArrangement = Arrangement.spacedBy(8.dp)
+              horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
               Icon(
                 imageVector = Icons.Default.PlayArrow,
                 contentDescription = null,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(22.dp),
+                tint = Color.White
               )
               Text(
-                text = "Begin ${uiState.selectedMode.title}",
+                text = "Start Timer • ${uiState.selectedMode.title}",
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White
               )
             }
           }
@@ -357,24 +442,27 @@ fun FocusSessionScreen(
               .height(54.dp)
               .testTag("session_pause_resume_btn"),
             colors = ButtonDefaults.buttonColors(
-              containerColor = OffWhitePrimary,
-              contentColor = CharcoalBackground
+              containerColor = Color(0xFF22252E),
+              contentColor = Color.White
             ),
+            border = BorderStroke(1.5.dp, OffWhitePrimary),
             shape = RoundedCornerShape(14.dp)
           ) {
             Row(
               verticalAlignment = Alignment.CenterVertically,
-              horizontalArrangement = Arrangement.spacedBy(6.dp)
+              horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
               Icon(
                 imageVector = if (uiState.isSessionPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
                 contentDescription = null,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(18.dp),
+                tint = Color.White
               )
               Text(
                 text = if (uiState.isSessionPaused) "Resume" else "Pause",
                 style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White
               )
             }
           }
@@ -386,25 +474,28 @@ fun FocusSessionScreen(
               .weight(1f)
               .height(54.dp)
               .testTag("session_end_btn"),
-            border = androidx.compose.foundation.BorderStroke(1.dp, CharcoalBorder),
+            border = BorderStroke(1.5.dp, CharcoalBorder),
             shape = RoundedCornerShape(14.dp),
             colors = ButtonDefaults.outlinedButtonColors(
+              containerColor = CharcoalSurface,
               contentColor = OffWhitePrimary
             )
           ) {
             Row(
               verticalAlignment = Alignment.CenterVertically,
-              horizontalArrangement = Arrangement.spacedBy(6.dp)
+              horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
               Icon(
                 imageVector = Icons.Default.Stop,
                 contentDescription = null,
                 modifier = Modifier.size(18.dp),
-                tint = OffWhitePrimary
+                tint = Color(0xFFEF5350)
               )
               Text(
-                text = "Complete Session",
-                style = MaterialTheme.typography.labelLarge
+                text = "Stop Session",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Medium,
+                color = OffWhitePrimary
               )
             }
           }

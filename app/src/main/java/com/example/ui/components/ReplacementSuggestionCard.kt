@@ -5,6 +5,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -168,10 +169,11 @@ fun ReplacementSuggestionCard(
             .height(48.dp)
             .testTag("replacement_accept_btn"),
           colors = ButtonDefaults.buttonColors(
-            containerColor = OffWhitePrimary,
-            contentColor = CharcoalBackground
+            containerColor = androidx.compose.ui.graphics.Color(0xFF22252E),
+            contentColor = androidx.compose.ui.graphics.Color.White
           ),
-          shape = RoundedCornerShape(12.dp)
+          border = BorderStroke(1.5.dp, OffWhitePrimary),
+          shape = RoundedCornerShape(14.dp)
         ) {
           Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -180,12 +182,14 @@ fun ReplacementSuggestionCard(
             Icon(
               imageVector = Icons.Default.Check,
               contentDescription = null,
-              modifier = Modifier.size(16.dp)
+              modifier = Modifier.size(16.dp),
+              tint = androidx.compose.ui.graphics.Color.White
             )
             Text(
               text = activity.promptAction,
               style = MaterialTheme.typography.labelLarge,
-              fontWeight = FontWeight.SemiBold
+              fontWeight = FontWeight.SemiBold,
+              color = androidx.compose.ui.graphics.Color.White
             )
           }
         }
@@ -197,15 +201,17 @@ fun ReplacementSuggestionCard(
             .weight(0.9f)
             .height(48.dp)
             .testTag("replacement_dismiss_btn"),
-          border = androidx.compose.foundation.BorderStroke(1.dp, CharcoalBorder),
-          shape = RoundedCornerShape(12.dp),
+          border = BorderStroke(1.5.dp, CharcoalBorder),
+          shape = RoundedCornerShape(14.dp),
           colors = ButtonDefaults.outlinedButtonColors(
-            contentColor = OffWhiteMuted
+            containerColor = CharcoalSurface,
+            contentColor = OffWhitePrimary
           )
         ) {
           Text(
             text = "Continue",
-            style = MaterialTheme.typography.labelMedium
+            style = MaterialTheme.typography.labelMedium,
+            color = OffWhitePrimary
           )
         }
       }

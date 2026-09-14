@@ -151,11 +151,11 @@ class FocuzFirebaseRepository {
           }
 
           if (snapshot != null && snapshot.exists()) {
-            val streak = snapshot.getLong("currentStreakDays")?.toInt() ?: 3
-            val intentional = snapshot.getLong("intentionalMinutes")?.toInt() ?: 165
-            val scroll = snapshot.getLong("scrollMinutes")?.toInt() ?: 18
-            val intercepted = snapshot.getLong("interceptedOpens")?.toInt() ?: 14
-            val mindful = snapshot.getLong("mindfulPausesTaken")?.toInt() ?: 8
+            val streak = snapshot.getLong("currentStreakDays")?.toInt() ?: 0
+            val intentional = snapshot.getLong("intentionalMinutes")?.toInt() ?: 0
+            val scroll = snapshot.getLong("scrollMinutes")?.toInt() ?: 0
+            val intercepted = snapshot.getLong("interceptedOpens")?.toInt() ?: 0
+            val mindful = snapshot.getLong("mindfulPausesTaken")?.toInt() ?: 0
 
             onStatsUpdate(streak, intentional, scroll, intercepted, mindful)
           } else {
