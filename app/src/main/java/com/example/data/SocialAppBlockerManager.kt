@@ -19,6 +19,7 @@ object SocialAppBlockerManager {
   private const val KEY_PREFIX_MANUAL_USAGE = "app_manual_usage_"
   private const val KEY_LAST_USAGE_DATE = "last_usage_date"
   private const val KEY_INTERCEPTED_COUNT = "total_blocked_intercepts"
+  private const val KEY_TODAY_INTERCEPTED_COUNT = "today_blocked_intercepts"
 
   val DEFAULT_MONITORED_APPS = listOf(
     SocialAppLimit(
@@ -173,9 +174,66 @@ object SocialAppBlockerManager {
     }
   }
 
+  fun getTodayDateKey(): String {
+    val cal = Calendar.getInstance()
+    val y = cal.get(Calendar.YEAR)
+    val m = cal.get(Calendar.MONTH) + 1
+    val d = cal.get(Calendar.DAY_OF_MONTH)
+    return String.format(java.util.Locale.US, "%04d-%02d-%02d", y, m, d)
+  }
+
+  fun getMillisUntilNextMidnight(): Long {
+    val now = Calendar.getInstance()
+    val nextMidnight = Calendar.getInstance().apply {
+      add(Calendar.DAY_OF_YEAR, 1)
+      set(Calendar.HOUR_OF_DAY, 0)
+      set(Calendar.MINUTE, 0)
+      set(Calendar.SECOND, 0)
+      set(Calendar.MILLISECOND, 0)
+    }
+    return (nextMidnight.timeInMillis - now.timeInMillis).coerceAtLeast(1000L)
+  }
+
+  fun formatTimeRemainingUntilMidnight(): String {
+    val millis = getMillisUntilNextMidnight()
+    val totalMins = (millis / (1000 * 60)).toInt()
+    val hours = totalMins / 60
+    val mins = totalMins % 60
+    return if (hours > 0) "${hours}h ${mins}m" else "${mins}m"
+  }
+
+  fun checkAndPerformMidnightReset(context: Context): Boolean {
+    val prefs = getPrefs(context)
+    val todayKey = getTodayDateKey()
+    val lastDate = prefs.getString(KEY_LAST_USAGE_DATE, "")
+    if (lastDate != todayKey) {
+      val editor = prefs.edit()
+      editor.putString(KEY_LAST_USAGE_DATE, todayKey)
+      DEFAULT_MONITORED_APPS.forEach { app ->
+        editor.remove(KEY_PREFIX_MANUAL_USAGE + app.packageName)
+      }
+      editor.putInt(KEY_TODAY_INTERCEPTED_COUNT, 0)
+      editor.apply()
+      Log.d(TAG, "Daily reset performed at midnight transition from $lastDate to $todayKey")
+      return true
+    }
+    return false
+  }
+
+  fun forceMidnightResetForTesting(context: Context) {
+    val prefs = getPrefs(context)
+    val editor = prefs.edit()
+    editor.putString(KEY_LAST_USAGE_DATE, getTodayDateKey())
+    DEFAULT_MONITORED_APPS.forEach { app ->
+      editor.remove(KEY_PREFIX_MANUAL_USAGE + app.packageName)
+    }
+    editor.putInt(KEY_TODAY_INTERCEPTED_COUNT, 0)
+    editor.apply()
+  }
+
   fun getMonitoredApps(context: Context): List<SocialAppLimit> {
     val prefs = getPrefs(context)
-    checkDateReset(prefs)
+    checkAndPerformMidnightReset(context)
 
     val usageStatsMap = if (hasUsageStatsPermission(context)) {
       queryTodayUsageMinutes(context)
@@ -212,15 +270,26 @@ object SocialAppBlockerManager {
 
   fun addManualUsageMinutes(context: Context, packageName: String, minutesToAdd: Int) {
     val prefs = getPrefs(context)
-    checkDateReset(prefs)
+    checkAndPerformMidnightReset(context)
     val current = prefs.getInt(KEY_PREFIX_MANUAL_USAGE + packageName, 0)
     prefs.edit().putInt(KEY_PREFIX_MANUAL_USAGE + packageName, current + minutesToAdd).apply()
   }
 
   fun recordIntercept(context: Context) {
     val prefs = getPrefs(context)
-    val current = prefs.getInt(KEY_INTERCEPTED_COUNT, 0)
-    prefs.edit().putInt(KEY_INTERCEPTED_COUNT, current + 1).apply()
+    checkAndPerformMidnightReset(context)
+    val total = prefs.getInt(KEY_INTERCEPTED_COUNT, 0)
+    val today = prefs.getInt(KEY_TODAY_INTERCEPTED_COUNT, 0)
+    prefs.edit()
+      .putInt(KEY_INTERCEPTED_COUNT, total + 1)
+      .putInt(KEY_TODAY_INTERCEPTED_COUNT, today + 1)
+      .apply()
+  }
+
+  fun getTodayIntercepts(context: Context): Int {
+    val prefs = getPrefs(context)
+    checkAndPerformMidnightReset(context)
+    return prefs.getInt(KEY_TODAY_INTERCEPTED_COUNT, 0)
   }
 
   fun getTotalIntercepts(context: Context): Int {
@@ -259,18 +328,5 @@ object SocialAppBlockerManager {
       Log.w(TAG, "Failed querying usage stats: ${e.message}")
     }
     return result
-  }
-
-  private fun checkDateReset(prefs: SharedPreferences) {
-    val todayKey = Calendar.getInstance().get(Calendar.DAY_OF_YEAR).toString()
-    val lastDate = prefs.getString(KEY_LAST_USAGE_DATE, "")
-    if (lastDate != todayKey) {
-      val editor = prefs.edit()
-      editor.putString(KEY_LAST_USAGE_DATE, todayKey)
-      DEFAULT_MONITORED_APPS.forEach { app ->
-        editor.remove(KEY_PREFIX_MANUAL_USAGE + app.packageName)
-      }
-      editor.apply()
-    }
   }
 }

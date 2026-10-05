@@ -38,6 +38,9 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.FocusContextMode
 import com.example.data.FocuzUiState
+import com.example.ui.components.PomodoroFocusTimer
 import com.example.ui.theme.CharcoalBackground
 import com.example.ui.theme.CharcoalBorder
 import com.example.ui.theme.CharcoalSurface
@@ -62,8 +66,8 @@ import com.example.ui.theme.OffWhiteSubtle
 
 /**
  * Focus Session Screen.
- * Features active session timer, context label ("Exam Mode: tighter limits"), pause/end controls,
- * and encouraging calm microcopy.
+ * Features Pomodoro focus timer component with work duration setting and calm countdown interface,
+ * as well as continuous context session mode.
  */
 @Composable
 fun FocusSessionScreen(
@@ -74,8 +78,10 @@ fun FocusSessionScreen(
   onEndSession: () -> Unit,
   onSelectMode: (FocusContextMode) -> Unit,
   onSetDuration: (Int) -> Unit = {},
+  onPomodoroCompleted: (Int) -> Unit = {},
   modifier: Modifier = Modifier
 ) {
+  var selectedTab by remember { mutableIntStateOf(0) } // 0 = Pomodoro, 1 = Continuous Flow
   val minutes = uiState.sessionRemainingSeconds / 60
   val seconds = uiState.sessionRemainingSeconds % 60
   val timeFormatted = String.format("%02d:%02d", minutes, seconds)
@@ -121,54 +127,108 @@ fun FocusSessionScreen(
       }
     }
 
-    // Context label & mode selector
+    // Mode Selector Tab (Pomodoro Timer vs Continuous Flow)
     item {
-      Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.Start
+      Row(
+        modifier = Modifier
+          .fillMaxWidth()
+          .clip(RoundedCornerShape(14.dp))
+          .background(CharcoalSurface)
+          .border(1.dp, CharcoalBorder, RoundedCornerShape(14.dp))
+          .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
       ) {
-        Text(
-          text = "CONTEXT MODE",
-          style = MaterialTheme.typography.labelSmall,
-          color = OffWhiteMuted,
-          letterSpacing = 1.sp
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-          uiState.availableModes.take(3).forEach { mode ->
-            val isSelected = uiState.selectedMode.id == mode.id
-            Box(
-              modifier = Modifier
-                .weight(1f)
-                .clip(RoundedCornerShape(14.dp))
-                .background(if (isSelected) Color(0xFF22252E) else CharcoalSurface)
-                .border(
-                  width = if (isSelected) 1.5.dp else 1.dp,
-                  color = if (isSelected) OffWhitePrimary else CharcoalBorder,
-                  shape = RoundedCornerShape(14.dp)
-                )
-                .clickable { onSelectMode(mode) }
-                .padding(vertical = 12.dp, horizontal = 8.dp)
-                .testTag("mode_chip_${mode.id}"),
-              contentAlignment = Alignment.Center
-            ) {
-              Text(
-                text = mode.title,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                color = if (isSelected) Color.White else OffWhiteMuted,
-                maxLines = 1
+        listOf("Pomodoro Timer", "Continuous Flow").forEachIndexed { index, label ->
+          val isSelected = selectedTab == index
+          Box(
+            modifier = Modifier
+              .weight(1f)
+              .clip(RoundedCornerShape(10.dp))
+              .background(if (isSelected) Color(0xFF22252E) else Color.Transparent)
+              .border(
+                width = if (isSelected) 1.dp else 0.dp,
+                color = if (isSelected) OffWhitePrimary.copy(alpha = 0.5f) else Color.Transparent,
+                shape = RoundedCornerShape(10.dp)
               )
-            }
+              .clickable { selectedTab = index }
+              .padding(vertical = 10.dp)
+              .testTag(if (index == 0) "tab_pomodoro_timer" else "tab_continuous_flow"),
+            contentAlignment = Alignment.Center
+          ) {
+            Text(
+              text = label,
+              style = MaterialTheme.typography.labelMedium,
+              fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+              color = if (isSelected) Color.White else OffWhiteMuted
+            )
           }
         }
       }
     }
+
+    if (selectedTab == 0) {
+      // Dedicated Pomodoro Focus Timer Component
+      item {
+        PomodoroFocusTimer(
+          onWorkCompleted = onPomodoroCompleted,
+          initialWorkDurationMinutes = 25,
+          initialBreakDurationMinutes = 5,
+          initialLongBreakDurationMinutes = 15
+        )
+      }
+
+      item {
+        Spacer(modifier = Modifier.height(24.dp))
+      }
+    } else {
+      // Context label & mode selector
+      item {
+        Column(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalAlignment = Alignment.Start
+        ) {
+          Text(
+            text = "CONTEXT MODE",
+            style = MaterialTheme.typography.labelSmall,
+            color = OffWhiteMuted,
+            letterSpacing = 1.sp
+          )
+
+          Spacer(modifier = Modifier.height(10.dp))
+
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+          ) {
+            uiState.availableModes.take(3).forEach { mode ->
+              val isSelected = uiState.selectedMode.id == mode.id
+              Box(
+                modifier = Modifier
+                  .weight(1f)
+                  .clip(RoundedCornerShape(14.dp))
+                  .background(if (isSelected) Color(0xFF22252E) else CharcoalSurface)
+                  .border(
+                    width = if (isSelected) 1.5.dp else 1.dp,
+                    color = if (isSelected) OffWhitePrimary else CharcoalBorder,
+                    shape = RoundedCornerShape(14.dp)
+                  )
+                  .clickable { onSelectMode(mode) }
+                  .padding(vertical = 12.dp, horizontal = 8.dp)
+                  .testTag("mode_chip_${mode.id}"),
+                contentAlignment = Alignment.Center
+              ) {
+                Text(
+                  text = mode.title,
+                  style = MaterialTheme.typography.labelMedium,
+                  fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                  color = if (isSelected) Color.White else OffWhiteMuted,
+                  maxLines = 1
+                )
+              }
+            }
+          }
+        }
+      }
 
     // Timer Duration & Reminder Interval Selector
     if (!uiState.isSessionActive) {
@@ -544,6 +604,7 @@ fun FocusSessionScreen(
       }
 
       Spacer(modifier = Modifier.height(28.dp))
+    }
     }
   }
 }

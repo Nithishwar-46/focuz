@@ -68,6 +68,8 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.FocuzViewModel
+import com.example.ui.components.BuddyPairModal
+import com.example.ui.components.DailyTimerHistoryModal
 import com.example.ui.components.IntentTagModal
 import com.example.ui.components.ReplacementSuggestionCard
 import com.example.ui.screens.AccountabilityScreen
@@ -109,6 +111,7 @@ fun FocuzApp(
   val coroutineScope = rememberCoroutineScope()
 
   LifecycleResumeEffect(Unit) {
+    viewModel.checkAndPerformDateReset(context)
     viewModel.refreshSocialBlockerState(context)
     onPauseOrDispose { }
   }
@@ -201,6 +204,8 @@ fun FocuzApp(
           onNavigateToFocusSession = { selectedTabIndex = 1 },
           onNavigateToLimits = { selectedTabIndex = 3 },
           onOpenProfile = { selectedTabIndex = 4 },
+          onOpenHistory = { viewModel.openHistoryModal() },
+          onDismissMidnightBanner = { viewModel.dismissMidnightBanner() },
           onSignOut = { viewModel.signOut() }
         )
         1 -> FocusSessionScreen(
@@ -215,7 +220,13 @@ fun FocuzApp(
             }
           },
           onSelectMode = { mode -> viewModel.setFocusMode(mode) },
-          onSetDuration = { mins -> viewModel.setCustomSessionMinutes(mins) }
+          onSetDuration = { mins -> viewModel.setCustomSessionMinutes(mins) },
+          onPomodoroCompleted = { mins ->
+            viewModel.recordCompletedPomodoro(mins)
+            coroutineScope.launch {
+              snackbarHostState.showSnackbar("Pomodoro completed! $mins focus minutes logged 🔥")
+            }
+          }
         )
         2 -> AccountabilityScreen(
           uiState = uiState,
@@ -224,7 +235,9 @@ fun FocuzApp(
             coroutineScope.launch {
               snackbarHostState.showSnackbar("Cheer sent! Quiet momentum shared.")
             }
-          }
+          },
+          onOpenPairBuddy = { viewModel.openBuddyPairModal() },
+          onRemoveBuddy = { viewModel.removeBuddy() }
         )
         3 -> PermittedScrollScreen(
           uiState = uiState,
@@ -342,6 +355,33 @@ fun FocuzApp(
             }
           }
         }
+      }
+
+      // Daily Timer Records & 12:00 AM Reset History Modal
+      if (uiState.showHistoryModal) {
+        DailyTimerHistoryModal(
+          uiState = uiState,
+          onDismiss = { viewModel.dismissHistoryModal() },
+          onForceResetTest = {
+            viewModel.forceMidnightResetForTesting(context)
+            coroutineScope.launch {
+              snackbarHostState.showSnackbar("12:00 AM Midnight reset tested! Today's timers reset to 0m.")
+            }
+          }
+        )
+      }
+
+      // Buddy Pairing Modal
+      if (uiState.showBuddyPairModal) {
+        BuddyPairModal(
+          onDismiss = { viewModel.dismissBuddyPairModal() },
+          onPair = { name, initials, note ->
+            viewModel.pairBuddy(name, initials, note)
+            coroutineScope.launch {
+              snackbarHostState.showSnackbar("Paired with $name! Quiet momentum activated.")
+            }
+          }
+        )
       }
     }
   }

@@ -57,6 +57,8 @@ import com.example.ui.theme.OffWhiteSubtle
 fun AccountabilityScreen(
   uiState: FocuzUiState,
   onSendCheer: () -> Unit,
+  onOpenPairBuddy: () -> Unit = {},
+  onRemoveBuddy: () -> Unit = {},
   modifier: Modifier = Modifier
 ) {
   val daysOfWeek = listOf("M", "T", "W", "T", "F", "S", "S")
@@ -129,17 +131,37 @@ fun AccountabilityScreen(
               modifier = Modifier.size(36.dp)
             )
             Text(
-              text = "None",
+              text = "No Buddy Paired",
               style = MaterialTheme.typography.titleMedium,
               fontWeight = FontWeight.Medium,
               color = OffWhitePrimary
             )
             Text(
-              text = "No focus buddy paired yet. Link an accountability partner to share quiet momentum.",
+              text = "Link an accountability partner like Maya or a classmate to share quiet momentum and weekly pacts.",
               style = MaterialTheme.typography.bodySmall,
               color = OffWhiteMuted,
               textAlign = TextAlign.Center
             )
+            Spacer(modifier = Modifier.height(6.dp))
+            Button(
+              onClick = onOpenPairBuddy,
+              modifier = Modifier
+                .height(48.dp)
+                .testTag("btn_pair_study_buddy"),
+              colors = ButtonDefaults.buttonColors(
+                containerColor = androidx.compose.ui.graphics.Color(0xFF22252E),
+                contentColor = androidx.compose.ui.graphics.Color.White
+              ),
+              border = BorderStroke(1.5.dp, OffWhitePrimary),
+              shape = RoundedCornerShape(14.dp)
+            ) {
+              Text(
+                text = "Pair Study Buddy",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = androidx.compose.ui.graphics.Color.White
+              )
+            }
           }
         }
       } else {

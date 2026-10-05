@@ -1,9 +1,13 @@
 package com.example.data
 
+import android.app.Application
 import android.content.Context
 import android.content.Intent
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.data.local.DailyTimerRecordEntity
+import com.example.data.local.DailyTimerRepository
+import com.example.data.local.FocuzDatabase
 import com.example.ui.BlockOverlayActivity
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -105,20 +109,46 @@ data class FocuzUiState(
   val totalAppIntercepts: Int = 0,
 
   // Intent History Logs (empty until user actually interacts)
-  val recentLogs: List<IntentLogItem> = emptyList()
+  val recentLogs: List<IntentLogItem> = emptyList(),
+
+  // Daily 12:00 AM Midnight Reset & Room History Records
+  val timeUntilMidnightReset: String = SocialAppBlockerManager.formatTimeRemainingUntilMidnight(),
+  val lastMidnightResetDate: String = SocialAppBlockerManager.getTodayDateKey(),
+  val archivedTimerRecords: List<DailyTimerRecordEntity> = emptyList(),
+  val showHistoryModal: Boolean = false,
+  val showBuddyPairModal: Boolean = false,
+  val midnightCelebrationBanner: String? = null
 )
 
 class FocuzViewModel(
+  application: Application,
   private val repository: FocuzFirebaseRepository = FocuzFirebaseRepository(),
   private val authRepository: FocuzAuthRepository = FocuzAuthRepository()
-) : ViewModel() {
+) : AndroidViewModel(application) {
   private val _uiState = MutableStateFlow(FocuzUiState())
   val uiState: StateFlow<FocuzUiState> = _uiState.asStateFlow()
 
+  private val localDb = FocuzDatabase.getDatabase(application)
+  private val dailyTimerRepository = DailyTimerRepository(localDb.dailyTimerRecordDao())
+  private var lastActiveDateKey: String = SocialAppBlockerManager.getTodayDateKey()
+  private var midnightTickerJob: Job? = null
   private var timerJob: Job? = null
 
   init {
-    // Check if user is already signed in
+    // 1. Observe Room local database for archived daily records
+    viewModelScope.launch {
+      dailyTimerRepository.allRecords.collect { records ->
+        _uiState.update { it.copy(archivedTimerRecords = records) }
+      }
+    }
+
+    // 2. Check if a date rollover occurred while app was closed
+    checkAndPerformDateReset(application.applicationContext)
+
+    // 3. Start precise 12:00 AM midnight scheduler
+    startMidnightResetTicker()
+
+    // 4. Check if user is already signed in
     val existingUser = authRepository.getCurrentUser()
     if (existingUser != null) {
       _uiState.update { it.copy(currentUser = existingUser) }
@@ -457,6 +487,20 @@ class FocuzViewModel(
     syncCurrentStats()
   }
 
+  fun recordCompletedPomodoro(durationMinutes: Int) {
+    val mins = durationMinutes.coerceAtLeast(1)
+    _uiState.update { current ->
+      val newIntentional = current.intentionalMinutes + mins
+      val newStreak = if (newIntentional > 0 && current.currentStreakDays == 0) 1 else current.currentStreakDays
+      current.copy(
+        intentionalMinutes = newIntentional,
+        currentStreakDays = newStreak,
+        streakCelebrationMessage = "Pomodoro completed! $mins intentional focus minutes recorded 🔥"
+      )
+    }
+    syncCurrentStats()
+  }
+
   private fun runTimer() {
     timerJob?.cancel()
     timerJob = viewModelScope.launch {
@@ -726,8 +770,150 @@ class FocuzViewModel(
     context.startActivity(intent)
   }
 
+  // Daily 12:00 AM Midnight Reset & Countdown Logic
+  private fun startMidnightResetTicker() {
+    midnightTickerJob?.cancel()
+    midnightTickerJob = viewModelScope.launch {
+      while (true) {
+        val currentDateKey = SocialAppBlockerManager.getTodayDateKey()
+        val timeRemaining = SocialAppBlockerManager.formatTimeRemainingUntilMidnight()
+        _uiState.update {
+          it.copy(
+            timeUntilMidnightReset = timeRemaining,
+            lastMidnightResetDate = currentDateKey
+          )
+        }
+
+        // Check if date changed
+        if (currentDateKey != lastActiveDateKey) {
+          performMidnightReset(getApplication())
+        }
+
+        val millisUntilMidnight = SocialAppBlockerManager.getMillisUntilNextMidnight()
+        if (millisUntilMidnight <= 1000L) {
+          delay(1500L)
+          performMidnightReset(getApplication())
+        } else {
+          // Update countdown every 30 seconds
+          val sleepMs = minOf(millisUntilMidnight, 30_000L)
+          delay(sleepMs)
+        }
+      }
+    }
+  }
+
+  fun checkAndPerformDateReset(context: Context) {
+    val todayKey = SocialAppBlockerManager.getTodayDateKey()
+    if (todayKey != lastActiveDateKey) {
+      performMidnightReset(context)
+    } else {
+      refreshSocialBlockerState(context)
+    }
+  }
+
+  fun performMidnightReset(context: Context) {
+    val previousDateKey = lastActiveDateKey
+    val newTodayKey = SocialAppBlockerManager.getTodayDateKey()
+    val state = _uiState.value
+
+    // 1. Archive yesterday's record to Room DB if there was any recorded activity
+    viewModelScope.launch {
+      val goalMins = state.userProfile.focusGoalMins.takeIf { it > 0 } ?: 60
+      val achieved = state.intentionalMinutes >= goalMins
+      val record = DailyTimerRecordEntity(
+        date = previousDateKey,
+        intentionalFocusMinutes = state.intentionalMinutes,
+        scrollMinutes = state.scrollMinutes,
+        interceptedOpens = state.interceptedOpens,
+        mindfulPausesTaken = state.mindfulPausesTaken,
+        focusGoalMinutes = goalMins,
+        goalAchieved = achieved,
+        recordedAtTimestamp = System.currentTimeMillis()
+      )
+      dailyTimerRepository.saveRecord(record)
+    }
+
+    // 2. Perform midnight reset in SocialAppBlockerManager
+    SocialAppBlockerManager.checkAndPerformMidnightReset(context)
+    val updatedApps = SocialAppBlockerManager.getMonitoredApps(context)
+
+    // 3. Update streak
+    val goalMet = state.intentionalMinutes >= (if (state.userProfile.focusGoalMins > 0) state.userProfile.focusGoalMins else 15)
+    val newStreak = if (goalMet) state.currentStreakDays + 1 else if (state.intentionalMinutes > 0) state.currentStreakDays else 0
+
+    lastActiveDateKey = newTodayKey
+
+    // 4. Reset today's active metrics in UI state
+    _uiState.update { current ->
+      current.copy(
+        intentionalMinutes = 0,
+        scrollMinutes = 0,
+        interceptedOpens = 0,
+        mindfulPausesTaken = 0,
+        monitoredSocialApps = updatedApps,
+        currentStreakDays = newStreak,
+        lastMidnightResetDate = newTodayKey,
+        timeUntilMidnightReset = SocialAppBlockerManager.formatTimeRemainingUntilMidnight(),
+        midnightCelebrationBanner = "New day started at 12:00 AM! Today's app timers have been reset. 🌅",
+        streakCelebrationMessage = if (newStreak > 0) "$newStreak day streak active 🔥" else "New day started at 12:00 AM 🌱"
+      )
+    }
+
+    // 5. Sync to Firestore
+    syncCurrentStats()
+  }
+
+  fun forceMidnightResetForTesting(context: Context) {
+    SocialAppBlockerManager.forceMidnightResetForTesting(context)
+    performMidnightReset(context)
+  }
+
+  fun openHistoryModal() {
+    _uiState.update { it.copy(showHistoryModal = true) }
+  }
+
+  fun dismissHistoryModal() {
+    _uiState.update { it.copy(showHistoryModal = false) }
+  }
+
+  fun dismissMidnightBanner() {
+    _uiState.update { it.copy(midnightCelebrationBanner = null) }
+  }
+
+  fun openBuddyPairModal() {
+    _uiState.update { it.copy(showBuddyPairModal = true) }
+  }
+
+  fun dismissBuddyPairModal() {
+    _uiState.update { it.copy(showBuddyPairModal = false) }
+  }
+
+  fun pairBuddy(name: String, initials: String = "", note: String = "Studying mindfully") {
+    val cleanName = name.trim().ifBlank { "Study Buddy" }
+    val cleanInitials = if (initials.isNotBlank()) initials.trim().take(2).uppercase() else cleanName.take(2).uppercase()
+    val newFriend = FriendAccountability(
+      name = cleanName,
+      initials = cleanInitials,
+      streakDays = 3,
+      intentionalityPercent = 94,
+      hoursFocusedToday = "55m",
+      statusNote = note.trim().ifBlank { "Sharing quiet momentum" }
+    )
+    _uiState.update {
+      it.copy(
+        friend = newFriend,
+        showBuddyPairModal = false
+      )
+    }
+  }
+
+  fun removeBuddy() {
+    _uiState.update { it.copy(friend = null) }
+  }
+
   override fun onCleared() {
     super.onCleared()
+    midnightTickerJob?.cancel()
     timerJob?.cancel()
   }
 }

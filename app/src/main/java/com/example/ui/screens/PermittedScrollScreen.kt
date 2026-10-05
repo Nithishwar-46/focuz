@@ -390,6 +390,43 @@ fun PermittedScrollScreen(
         }
       }
 
+      // 12:00 AM Reset Notification
+      item {
+        Box(
+          modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color(0xFF1E2129))
+            .border(1.dp, CharcoalBorder, RoundedCornerShape(14.dp))
+            .padding(12.dp)
+        ) {
+          Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+          ) {
+            Icon(
+              imageVector = Icons.Default.Schedule,
+              contentDescription = null,
+              tint = Color(0xFF81C784),
+              modifier = Modifier.size(20.dp)
+            )
+            Column {
+              Text(
+                text = "Resets Daily at 12:00 AM Midnight",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = OffWhitePrimary
+              )
+              Text(
+                text = "App limit timers reset to 0m every midnight (in ${uiState.timeUntilMidnightReset}).",
+                style = MaterialTheme.typography.bodySmall,
+                color = OffWhiteMuted
+              )
+            }
+          }
+        }
+      }
+
       // 4. List of Monitored Social Media Apps
       items(uiState.monitoredSocialApps, key = { it.packageName }) { appLimit ->
         SocialAppLimitCard(
