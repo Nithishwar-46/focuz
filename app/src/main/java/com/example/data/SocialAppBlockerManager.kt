@@ -202,6 +202,11 @@ object SocialAppBlockerManager {
     return if (hours > 0) "${hours}h ${mins}m" else "${mins}m"
   }
 
+  /**
+   * Evaluates whether the calendar date has advanced past 12:00 AM midnight.
+   * If a date rollover is detected, clears daily manual app counters, resets the
+   * intercepted open counter to 0, updates [KEY_LAST_USAGE_DATE], and returns true.
+   */
   fun checkAndPerformMidnightReset(context: Context): Boolean {
     val prefs = getPrefs(context)
     val todayKey = getTodayDateKey()
@@ -220,6 +225,9 @@ object SocialAppBlockerManager {
     return false
   }
 
+  /**
+   * Manually forces a 12:00 AM reset state for developer diagnostics and testing.
+   */
   fun forceMidnightResetForTesting(context: Context) {
     val prefs = getPrefs(context)
     val editor = prefs.edit()
